@@ -1906,7 +1906,46 @@ Error GDScriptCompiler::_parse_block(CodeGen &codegen, const GDScriptParser::Sui
 
 #ifdef DEBUG_ENABLED
 		// Add a newline before each statement, since the debugger needs those.
-		gen->write_newline(s->start_line);
+		const int start_line = i > 0 ? p_block->statements[i - 1]->end_line + 1 : p_block->start_line;
+
+		int end_line;
+		switch (s->type) {
+			case GDScriptParser::Node::MATCH: {
+				const GDScriptParser::MatchNode *match = static_cast<const GDScriptParser::MatchNode *>(s);
+				end_line = match->test->end_line;
+			} break;
+			case GDScriptParser::Node::IF: {
+				const GDScriptParser::IfNode *if_n = static_cast<const GDScriptParser::IfNode *>(s);
+				end_line = if_n->condition->end_line;
+			} break;
+			case GDScriptParser::Node::FOR: {
+				const GDScriptParser::ForNode *for_n = static_cast<const GDScriptParser::ForNode *>(s);
+				end_line = for_n->list->end_line;
+			} break;
+			case GDScriptParser::Node::WHILE: {
+				const GDScriptParser::WhileNode *while_n = static_cast<const GDScriptParser::WhileNode *>(s);
+				end_line = while_n->condition->end_line;
+			} break;
+			default: {
+				end_line = s->end_line;
+			} break;
+		}
+
+		// The line the debugger will indicate we are currently executing.
+		const int debugger_line = s->start_line;
+
+		// Add a newline. The debugger uses this to check for breakpoints.
+		// Write the range from the previous node's end line to the current node's end line. This has the following properties:
+		//   1. captures breakpoints on lines before this statement that are only whitespace or comments
+		//   2. captures breakpoints on statements that span across multiple lines
+		//
+		// e.g. A breakpoint could be set on any of the following lines:
+		// 
+		//         # Test comment                  [start_line]
+		//    >>>  var foo = 1 + 2 + \             [debugger_line]
+		//                   3 + 4 + \
+		//                   5 + 6                 [end_line]
+		gen->write_newline_range(start_line, end_line, debugger_line);
 #endif
 
 		switch (s->type) {
@@ -2030,6 +2069,8 @@ Error GDScriptCompiler::_parse_block(CodeGen &codegen, const GDScriptParser::Sui
 				if (err) {
 					return err;
 				}
+
+				// TODO: Breakpoints on if / elif
 
 				if (if_n->false_block) {
 					gen->write_else();
@@ -2334,7 +2375,9 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 			GDScriptDataType field_type = _gdtype_from_datatype(field->get_datatype(), codegen.script);
 			if (field_type.has_type) {
+#ifdef DEBUG_ENABLED
 				codegen.generator->write_newline(field->start_line);
+#endif
 
 				GDScriptCodeGenerator::Address dst_address(GDScriptCodeGenerator::Address::MEMBER, codegen.script->member_indices[field->identifier->name].index, field_type);
 
@@ -2369,7 +2412,9 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 			if (field->initializer) {
 				// Emit proper line change.
+#ifdef DEBUG_ENABLED
 				codegen.generator->write_newline(field->initializer->start_line);
+#endif
 
 				GDScriptCodeGenerator::Address src_address = _parse_expression(codegen, r_error, field->initializer, false, true);
 				if (r_error) {
@@ -2411,6 +2456,11 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 			}
 			codegen.generator->end_parameters();
 		}
+
+#ifdef DEBUG_ENABLED
+		// write a newline to allow a breakpoint on the func() declaration.
+		codegen.generator->write_newline(p_func->start_line);
+#endif
 
 		// No need to reset locals at the end of the function, the stack will be cleared anyway.
 		r_error = _parse_block(codegen, p_func->body, true, false);
@@ -2529,7 +2579,9 @@ GDScriptFunction *GDScriptCompiler::_make_static_initializer(Error &r_error, GDS
 
 		GDScriptDataType field_type = _gdtype_from_datatype(field->get_datatype(), codegen.script);
 		if (field_type.has_type) {
+#ifdef DEBUG_ENABLED
 			codegen.generator->write_newline(field->start_line);
+#endif
 
 			if (field_type.builtin_type == Variant::ARRAY && field_type.has_container_element_type(0)) {
 				GDScriptCodeGenerator::Address temp = codegen.add_temporary(field_type);
@@ -2563,8 +2615,10 @@ GDScriptFunction *GDScriptCompiler::_make_static_initializer(Error &r_error, GDS
 		}
 
 		if (field->initializer) {
+#ifdef DEBUG_ENABLED
 			// Emit proper line change.
 			codegen.generator->write_newline(field->initializer->start_line);
+#endif
 
 			GDScriptCodeGenerator::Address src_address = _parse_expression(codegen, r_error, field->initializer, false, true);
 			if (r_error) {

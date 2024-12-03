@@ -384,7 +384,7 @@ void (*type_init_function_table[])(Variant *) = {
 		&&OPCODE_TYPE_ADJUST_PACKED_VECTOR4_ARRAY,       \
 		&&OPCODE_ASSERT,                                 \
 		&&OPCODE_BREAKPOINT,                             \
-		&&OPCODE_LINE,                                   \
+		&&OPCODE_LINES,                                  \
 		&&OPCODE_END                                     \
 	};                                                   \
 	static_assert((sizeof(switch_table_ops) / sizeof(switch_table_ops[0]) == (OPCODE_END + 1)), "Opcodes in jump table aren't the same as opcodes in enum.");
@@ -3776,11 +3776,15 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 			}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_LINE) {
-				CHECK_SPACE(2);
+			OPCODE(OPCODE_LINES) {
+				CHECK_SPACE(4);
 
-				line = _code_ptr[ip + 1];
-				ip += 2;
+				const int start_line = _code_ptr[ip + 1];
+				const int end_line = _code_ptr[ip + 2];
+				const int debugger_line = _code_ptr[ip + 3];
+
+				line = debugger_line;
+				ip += 4;
 
 				if (EngineDebugger::is_active()) {
 					// line
@@ -3795,8 +3799,11 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 						}
 					}
 
-					if (EngineDebugger::get_script_debugger()->is_breakpoint(line, source)) {
-						do_break = true;
+					for (int line_index = start_line; line_index <= end_line; line_index++) {
+						if (EngineDebugger::get_script_debugger()->is_breakpoint(line_index, source)) {
+							do_break = true;
+							break;
+						}
 					}
 
 					if (unlikely(do_break)) {

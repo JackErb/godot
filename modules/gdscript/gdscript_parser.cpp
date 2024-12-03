@@ -1723,7 +1723,13 @@ GDScriptParser::SuiteNode *GDScriptParser::parse_suite(const String &p_context, 
 
 	bool multiline = false;
 
+	reset_extents(suite, current);
+
 	if (match(GDScriptTokenizer::Token::NEWLINE)) {
+		// HACK: Set the suite's start line to be the line after the start of the block. This is important for breakpoints in the debugger.
+		// We want the suite to capture any empty lines (lines with just whitespace or comments) at the start of the block so we can breakpoint there.
+		suite->start_line += 1;
+
 		multiline = true;
 	}
 
@@ -1734,7 +1740,6 @@ GDScriptParser::SuiteNode *GDScriptParser::parse_suite(const String &p_context, 
 			return suite;
 		}
 	}
-	reset_extents(suite, current);
 
 	int error_count = 0;
 

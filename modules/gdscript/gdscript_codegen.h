@@ -159,7 +159,9 @@ public:
 	virtual void write_break() = 0;
 	virtual void write_continue() = 0;
 	virtual void write_breakpoint() = 0;
-	virtual void write_newline(int p_line) = 0;
+	virtual void write_newline(int p_line) = 0; // Used to check for breakpoints
+	// Captures a multi-line statement. Used to check for breakpoints. The debugger will show execution is at p_debugger_line
+	virtual void write_newline_range(int p_start_line, int p_end_line, int p_debugger_line) = 0;
 	virtual void write_return(const Address &p_return_value) = 0;
 	virtual void write_assert(const Address &p_test, const Address &p_message) = 0;
 

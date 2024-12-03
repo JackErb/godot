@@ -1762,9 +1762,20 @@ void GDScriptByteCodeGenerator::write_breakpoint() {
 }
 
 void GDScriptByteCodeGenerator::write_newline(int p_line) {
-	append_opcode(GDScriptFunction::OPCODE_LINE);
-	append(p_line);
-	current_line = p_line;
+	write_newline_range(p_line, p_line, p_line);
+}
+
+void GDScriptByteCodeGenerator::write_newline_range(int p_start_line, int p_end_line, int p_debugger_line) {
+	ERR_FAIL_COND_MSG(!(p_start_line <= p_end_line), "Compiler bug: write_newline_range specified invalid range.");
+	ERR_FAIL_COND_MSG(!(p_debugger_line >= p_start_line && p_debugger_line <= p_end_line), "Compiler bug: write_newline_range specified invalid debugger line in range.");
+
+	// Captures a breakpoint in the range of [p_start_line, p_end_line]
+	// The debugger will show that the line being executed is p_debugger_line.
+	append_opcode(GDScriptFunction::OPCODE_LINES);
+	append(p_start_line);
+	append(p_end_line);
+	append(p_debugger_line);
+	current_line = p_debugger_line;
 }
 
 void GDScriptByteCodeGenerator::write_return(const Address &p_return_value) {

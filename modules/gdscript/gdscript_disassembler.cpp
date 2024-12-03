@@ -1200,18 +1200,22 @@ void GDScriptFunction::disassemble(const Vector<String> &p_code_lines) const {
 
 				incr += 3;
 			} break;
-			case OPCODE_LINE: {
-				int line = _code_ptr[ip + 1] - 1;
-				if (line >= 0 && line < p_code_lines.size()) {
-					text += "line ";
-					text += itos(line + 1);
+			case OPCODE_LINES: {
+				int line_start = _code_ptr[ip + 1] - 1;
+				int line_end = _code_ptr[ip + 2];
+				int debugger_line = _code_ptr[ip + 3];
+				if (debugger_line >= 0 && debugger_line < p_code_lines.size()) {
+					text += "lines ";
+					text += itos(line_start + 1);
+					text += " -> ";
+					text += itos(line_end);
 					text += ": ";
-					text += p_code_lines[line];
+					text += p_code_lines[debugger_line];
 				} else {
 					text += "";
 				}
 
-				incr += 2;
+				incr += 4;
 			} break;
 
 #define DISASSEMBLE_TYPE_ADJUST(m_v_type) \
