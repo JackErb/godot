@@ -1764,18 +1764,26 @@ GDScriptParser::SuiteNode *GDScriptParser::parse_suite(const String &p_context, 
 
 	bool multiline = false;
 
-	if (match(GDScriptTokenizer::Token::NEWLINE)) {
-		multiline = true;
-	}
 
-	if (multiline) {
+	if (check(GDScriptTokenizer::Token::NEWLINE)) {
+		// HACK: Rest the extents at the very top of the block, then increment start_line by 1.
+		// This ensures the suite's line range includes any empty lines at the start (e.g. whitespace or commented lines)
+		// This is important to trigger breakpoints on these empty lines.
+		reset_extents(suite, current);
+		suite->start_line += 1;
+
+		advance();
+
+		multiline = true;
+
 		if (!consume(GDScriptTokenizer::Token::INDENT, vformat(R"(Expected indented block after %s.)", p_context))) {
 			current_suite = suite->parent_block;
 			complete_extents(suite);
 			return suite;
 		}
+	} else {
+		reset_extents(suite, current);
 	}
-	reset_extents(suite, current);
 
 	int error_count = 0;
 
